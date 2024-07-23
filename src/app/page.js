@@ -1,15 +1,24 @@
 "use client"
 import FolderNode from '@/components/FolderNode';
 import TransferAnimation from '@/components/TransferAnimation';
-import { getAllDirectory, getFileWithDateRequest, getFileWithWordRequest, uploadHandler } from '@/http/upload';
+import { getAllDirectory, getFileWithDateRequest, getFileWithWordRequest, loginRequest, logoutRequest, uploadHandler } from '@/http/upload';
 import Link from 'next/link';
 import React, { useState, useRef, useEffect } from 'react';
 import { FaFile, FaFolder } from 'react-icons/fa6';
 import { FaRegFileLines } from "react-icons/fa6";
 import { RxCrossCircled } from "react-icons/rx";
 
+
+function formatDate(date) {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+  const year = date.getFullYear();
+  
+  return `${year}-${month}-${day}`;
+}
+
 const FolderSelector = () => {
-  const [folders, setFolder] = useState();
+  const [folders, setFolder] = useState([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
   const [date,setDate] = useState('');
@@ -17,6 +26,7 @@ const FolderSelector = () => {
   const [filesWithWords, setFileWithWords] = useState([]);
   const [filesWithDate, setFileWithDate] = useState([]);
   const [dateLoading, setDateLoading] = useState(false);
+  const [enddate, setEndDate] = useState('');
   
   const emptyDragRef = useRef();
   const DragRef = useRef();
@@ -165,6 +175,7 @@ const FolderSelector = () => {
     const timeoutref = setTimeout(() => {
       if(query){
         setDate('');
+        setEndDate('');
         getFileWithWords();
       }
     },1000);
@@ -176,7 +187,8 @@ const FolderSelector = () => {
   async function getFileWithDate (){
     setDateLoading(true)
     try {
-      const res = await getFileWithDateRequest(date);
+      const lastDate = enddate || formatDate(new Date())
+      const res = await getFileWithDateRequest(date,lastDate);
       setFileWithDate(res.data.files);
       setDateLoading(false);
     } catch (error) {
@@ -190,11 +202,25 @@ const FolderSelector = () => {
     if(date){
       getFileWithDate();
     }
-  },[date])
+  },[date,enddate])
+
+  const handelLogout = async () => {
+    try {
+      const res = await logoutRequest();
+      if(res.data.success){
+        window.location.reload()
+      }
+    } catch (error) {
+      console.log(error.message)
+    }
+  }
 
   return (
     <section className="section bg-primary min-h-screen px-10 py-10">
       <div className="container mx-auto">
+        <div className='flex items-center justify-between'>
+
+        
         <div className="header flex items-center overflow-x-auto gap-8">
           <label htmlFor="fileupload">
             <div className="w-[7rem] h-[7rem] cursor-pointer flex items-center flex-col justify-center gap-2 bg-secondary rounded-md">
@@ -209,6 +235,9 @@ const FolderSelector = () => {
               <span className='text-foregroud-primary/25 text-3xl'><FaFolder /></span>
             </div>
           </label>
+        </div>
+        <button className='py-2 px-4 rounded-3xl text-white bg-secondary' onClick={handelLogout}>Logout</button>
+
         </div>
         <input
           type="file"
@@ -272,8 +301,20 @@ const FolderSelector = () => {
             <div className='bg-secondary py-2 px-4 rounded-3xl w-[30rem] flex items-center'>
               <input placeholder='Search Words' className='bg-transparent border-none outline-none text-white flex-1' value={query} onChange={(e) => setQuery(e.target.value)}/>
             </div>
-            <div className='bg-secondary py-2 px-4 rounded-3xl w-[10rem] flex items-center cursor-pointer'>
-              <input type='date' className='bg-transparent border-none outline-none text-white flex-1 cursor-pointer' value={date} onChange={(e) => {setQuery(''); setDate(e.target.value)}}/>
+
+            <div className='flex items-center gap-5'>
+              <div>
+                <label className='text-white ml-2 mb-1'>Start</label>
+                <div className='bg-secondary py-2 px-4 rounded-3xl w-[10rem] flex items-center cursor-pointer'>
+                  <input type='date' className='bg-transparent border-none outline-none text-white flex-1 cursor-pointer' value={date} onChange={(e) => {setQuery(''); setDate(e.target.value)}}/>
+                </div>
+              </div>
+              <div>
+                <label className='text-white ml-2 mb-1'>End</label>
+                <div className='bg-secondary py-2 px-4 rounded-3xl w-[10rem] flex items-center cursor-pointer'>
+                  <input type='date' className='bg-transparent border-none outline-none text-white flex-1 cursor-pointer' value={enddate} onChange={(e) => {setQuery(''); setEndDate(e.target.value)}}/>
+                </div>
+              </div>
             </div>
           </div>
         }
@@ -292,6 +333,7 @@ const FolderSelector = () => {
             id="dropzone"
           >
             <div className='py-2'>
+              
               {
                 folders.map((node) => <FolderNode {...node} handleDragOver={handleDragOver} handleDrop={handleDrop} handleOnDragEnter={handleOnDragEnter} handleOnDragLeave={handleOnDragLeave}/>)
               }
@@ -337,10 +379,11 @@ const FolderSelector = () => {
 
             {
               filesWithWords && filesWithWords.length != 0 && !queryLoading && 
-              filesWithWords.map(({content,name,path}) => (
+              filesWithWords.map(({content,name,path,creationDate}) => (
                 <Link href={`/file/${name}?path=${path}&query=${query}`}>
                   <div className='p-2 bg-secondary rounded-md my-3'>
-                    <p className='text-sm text-white/50 mb-2'>{name}</p>
+                    <p className='text-sm text-white/50 mb-2 flex items-center'>{name}  <span className='ml-10 text-white/50'>Created at: {creationDate}</span>
+                    <span className='ml-10 text-white/50'>Last modified: {creationDate}</span> </p>
                   <p className='text-white/90 leading-6 font-normal' dangerouslySetInnerHTML={{ __html: content }}>
                     
                     </p>
@@ -395,11 +438,13 @@ const FolderSelector = () => {
 
             {
               filesWithDate && filesWithDate.length != 0 && !dateLoading && 
-              filesWithDate.map(({content,name,path}) => (
+              filesWithDate.map(({content,name,path,creationDate}) => (
                 <Link href={`/file/${name}?path=${path}`}>
                   <div className='py-2 px-4 bg-secondary rounded-md my-3 flex items-center gap-3'>
                     <span className='text-white/60'><FaRegFileLines size={20}/></span>
                     <p className='text-white/60 mb-0'>{name}</p>
+                    <span className='ml-10 text-white/50'>Created at: {creationDate}</span>
+                    <span className='ml-10 text-white/50'>Last modified: {creationDate}</span>
                   </div>
                 </Link>
               ))

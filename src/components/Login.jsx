@@ -12,6 +12,7 @@ const Login = ({setIsLogin}) => {
         try {
             if(!email || !password){
                 setMessage('Please Enter all fields');
+                return
             }
             
             const res = await loginRequest(email,password);

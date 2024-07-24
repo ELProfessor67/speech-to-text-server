@@ -13,6 +13,9 @@ export const uploadHandler = async (formData) => await api.post('/upload',formDa
 export const loginRequest = async (email,password) => await api.post('/login',{email,password},{headers: {
     'Content-Type': 'application/json'
 }})
+export const changePasswordRequest = async (oldpassword, newpassword) => await api.post('/change-password',{oldpassword, newpassword},{headers: {
+    'Content-Type': 'application/json'
+}})
 export const getAllDirectory = async () => await api.get('/get-folders')
 export const getFile = async (path) => await api.get(`/get-file?path=${path}`)
 export const getFileWithWordRequest = async (query) => await api.get(`/get-file-with-word?query=${query}`);

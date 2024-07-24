@@ -236,7 +236,11 @@ const FolderSelector = () => {
             </div>
           </label>
         </div>
-        <button className='py-2 px-4 rounded-3xl text-white bg-secondary' onClick={handelLogout}>Logout</button>
+        <div className='flex items-center gap-5'>
+
+          <button className='py-2 px-4 rounded-3xl text-white bg-secondary' onClick={handelLogout}>Logout</button>
+          <Link href='/change-password' className='py-2 px-4 rounded-3xl text-white bg-secondary'>Change Password</Link>
+        </div>
 
         </div>
         <input

@@ -7,6 +7,7 @@ const api = axios.create({
 });
 
 
+
 export const uploadHandler = async (formData) => await api.post('/upload',formData,{headers: {
     'Content-Type': 'multipart/form-data'
 }})

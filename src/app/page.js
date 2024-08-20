@@ -115,8 +115,9 @@ const FolderSelector = () => {
       formData.append(`date-${i}`,file.lastModified)
     });
 
+  
     if(path){
-      formData.append('currentpath',path)
+      formData.append(`storepath-{0}`,path)
     }
 
     const res = await uploadHandler(formData);

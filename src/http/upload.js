@@ -8,9 +8,16 @@ const api = axios.create({
 
 
 
-export const uploadHandler = async (formData) => await api.post('/upload',formData,{headers: {
+export const uploadHandler = async (formData,setUploadProgress) => await api.post('/upload',formData,{headers: {
     'Content-Type': 'multipart/form-data'
-}})
+}
+,onUploadProgress: (progressEvent) => {
+    const { loaded, total } = progressEvent;
+    let precentage = Math.floor((loaded * 100) / total);
+    setUploadProgress(precentage);
+  }
+
+})
 export const loginRequest = async (email,password) => await api.post('/login',{email,password},{headers: {
     'Content-Type': 'application/json'
 }})
@@ -23,3 +30,4 @@ export const getFileWithWordRequest = async (query) => await api.get(`/get-file-
 export const getFileWithDateRequest = async (date,enddate) => await api.get(`/get-file-with-date?date=${date}&enddate=${enddate}`);
 export const loadUser = async () => await api.get(`/me`);
 export const logoutRequest = async () => await api.get(`/logout`);
+export const contactRequest = async () => await axios.get(`https://cloud.hgsingalong.com/api/read-contact`);

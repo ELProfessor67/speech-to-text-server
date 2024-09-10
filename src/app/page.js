@@ -1,12 +1,38 @@
 "use client"
+import FileNode from '@/components/FilesNode';
 import FolderNode from '@/components/FolderNode';
 import TransferAnimation from '@/components/TransferAnimation';
-import { getAllDirectory, getFileWithDateRequest, getFileWithWordRequest, loginRequest, logoutRequest, uploadHandler } from '@/http/upload';
+import { contactRequest, getAllDirectory, getFileWithDateRequest, getFileWithWordRequest, loginRequest, logoutRequest, uploadHandler } from '@/http/upload';
+import { Flamenco } from 'next/font/google';
 import Link from 'next/link';
 import React, { useState, useRef, useEffect } from 'react';
 import { FaFile, FaFolder } from 'react-icons/fa6';
 import { FaRegFileLines } from "react-icons/fa6";
 import { RxCrossCircled } from "react-icons/rx";
+
+function parseCustomDateTime(dateTimeStr) {
+  // Extract date and time components
+  const year = parseInt(dateTimeStr.substring(0, 4));
+  const month = parseInt(dateTimeStr.substring(4, 6)) - 1; // Months are 0-based in JS
+  const day = parseInt(dateTimeStr.substring(6, 8));
+  const hours = parseInt(dateTimeStr.substring(9, 11));
+  const minutes = parseInt(dateTimeStr.substring(11, 13));
+  const seconds = parseInt(dateTimeStr.substring(13, 15));
+
+  // Create and return the Date object
+  return new Date(year, month, day, hours, minutes, seconds);
+}
+
+function groupByDate(dataArray) {
+  return dataArray.reduce((result, item) => {
+      const date = item.date;
+      if (!result[date]) {
+          result[date] = [];
+      }
+      result[date].push(item);
+      return result;
+  }, {});
+}
 
 
 function formatDate(date) {
@@ -27,6 +53,10 @@ const FolderSelector = () => {
   const [filesWithDate, setFileWithDate] = useState([]);
   const [dateLoading, setDateLoading] = useState(false);
   const [enddate, setEndDate] = useState('');
+  const [contact, setContact] = useState([]);
+  const [directory, setDirectory] = useState([]);
+  const [files, setFiles] = useState({});
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   const emptyDragRef = useRef();
   const DragRef = useRef();
@@ -107,21 +137,69 @@ const FolderSelector = () => {
     event.stopPropagation();
     const items = event.dataTransfer.items;
     const data = await getFilesDataTransferItems(items);
-    console.log(data);
+   
     const formData = new FormData();
     data.forEach((file,i) => {
+  
+      const [platform] = file.name.split('_');
+      const [filename,ext] = file.name.split('.');
+      let dateinfo, phone, _;
+      if (platform == 'phone') {
+        if(filename.split('_').length >= 4){
+          [_, dateinfo, _, phone] = filename.split('_');
+          console.log('upar')
+        }else{
+          [_, dateinfo, phone] = filename.split('_');
+          console.log('niche')
+        }
+        console.log(filename.split('_'),filename)
+      } else {
+        [_, dateinfo, phone] = filename.split('_');
+      }
+      console.log(platform, dateinfo, phone)
+      let name;
+      if (phone) {
+        if (isNaN(phone)) {
+          name = phone
+        } else {
+          let number = phone.slice(-10);
+          number = number.replaceAll(' ','');
+
+          const contactInfo = contact.filter(contact => contact.number?.replaceAll(' ','')?.includes(number));
+          console.log(contactInfo)
+          if (contactInfo.length == 0) {
+            name = phone;
+          } else {
+            name = contactInfo[0].name;
+          }
+          }
+      }
+      const time = dateinfo.split('-')[1]
+      const date = parseCustomDateTime(dateinfo)
+
+      name = name?.replaceAll(' ', '_');
+      console.info(name,phone,name || phone)
+      const filesname = `${name || phone}/${name || phone}.${ext}`;
       formData.append('files', file)
-      formData.append(`path-${i}`, file.filepath)
-      formData.append(`date-${i}`,file.lastModified)
+      formData.append(`path-${i}`, filesname)
+      formData.append(`creationdate-${i}`,file.lastModified)
+      formData.append(`date-${i}`,date.getTime() || new Date().getTime())
+      formData.append(`time-${i}`,time)
+
+      if(path){
+        formData.append(`storepath-${i}`,path+`/${name}`)
+      }else{
+        formData.append(`storepath-${i}`,`/root/file-manager-api/eligindi/Calls/${name}`)
+      }
     });
 
   
-    if(path){
-      formData.append(`storepath-{0}`,path)
-    }
 
-    const res = await uploadHandler(formData);
+
+    const res = await uploadHandler(formData,setUploadProgress);
+
     getFolders()
+    setUploadProgress(0)
     setLoading(false)
   };
 
@@ -149,6 +227,20 @@ const FolderSelector = () => {
     try {
       const res = await getAllDirectory();
       setFolder(res.data?.folder);
+      const data = res.data?.folder;
+      const files = data?.filter(file => !file.isFolder);
+      const directory = data?.filter(file => file.isFolder);
+      setFiles(groupByDate(files));
+      setDirectory(directory);
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  async function getContact() {
+    try {
+      const res = await contactRequest();
+      setContact(res.data?.contact);
     } catch (error) {
       console.log(error)
     }
@@ -167,8 +259,11 @@ const FolderSelector = () => {
     }
   }
 
+
+
   useEffect(() => {
     getFolders();
+    getContact();
   },[]);
 
 
@@ -215,6 +310,7 @@ const FolderSelector = () => {
       console.log(error.message)
     }
   }
+
 
   return (
     <section className="section bg-primary min-h-screen px-10 py-10">
@@ -338,14 +434,26 @@ const FolderSelector = () => {
             id="dropzone"
           >
             <div className='py-2'>
-              
               {
-                folders.map((node) => <FolderNode {...node} handleDragOver={handleDragOver} handleDrop={handleDrop} handleOnDragEnter={handleOnDragEnter} handleOnDragLeave={handleOnDragLeave}/>)
+                directory?.map((node) => <FolderNode {...node} handleDragOver={handleDragOver} handleDrop={handleDrop} handleOnDragEnter={handleOnDragEnter} handleOnDragLeave={handleOnDragLeave}/>)
+              }
+
+              {
+                Object.keys(files)?.map((key) => (
+                  <div>
+                    <h2 className='text-white mb-1'>{key}</h2>
+                    {
+                      files[key]?.map((file,index) => (
+                        <FileNode {...file} index={index+1}/>
+                      ))
+                    }
+                  </div>
+                ))
               }
             </div>
           </div>
           {
-            loading && <TransferAnimation/>
+            loading && <TransferAnimation uploadProgress={uploadProgress}/>
           }
           </div>
         }
@@ -384,10 +492,10 @@ const FolderSelector = () => {
 
             {
               filesWithWords && filesWithWords.length != 0 && !queryLoading && 
-              filesWithWords.map(({content,name,path,creationDate}) => (
-                <Link href={`/file/${name}?path=${path}&query=${query}`}>
+              filesWithWords.map(({content,name,path,creationDate,audioPath,time,platform},i) => (
+                <Link href={`/file/${name}?path=${path}&query=${query}&filename=${`${i+1}-${name}`}&audioPath=${audioPath}&creationDate=${creationDate}&time=${time}&platform=${platform}`}>
                   <div className='p-2 bg-secondary rounded-md my-3'>
-                    <p className='text-sm text-white/50 mb-2 flex items-center'>{name}  <span className='ml-10 text-white/50'>Created at: {creationDate}</span>
+                    <p className='text-sm text-white/50 mb-2 flex items-center'>{i+1}-{name}  <span className='ml-10 text-white/50'>Created at: {creationDate}</span>
                     <span className='ml-10 text-white/50'>Last modified: {creationDate}</span> </p>
                   <p className='text-white/90 leading-6 font-normal' dangerouslySetInnerHTML={{ __html: content }}>
                     
@@ -443,11 +551,11 @@ const FolderSelector = () => {
 
             {
               filesWithDate && filesWithDate.length != 0 && !dateLoading && 
-              filesWithDate.map(({content,name,path,creationDate}) => (
-                <Link href={`/file/${name}?path=${path}`}>
+              filesWithDate.map(({content,name,path,creationDate,audioPath,time,platform},i) => (
+                <Link href={`/file/${name}?path=${path}&filename=${`${i+1}-${name}`}&audioPath=${audioPath}&creationDate=${creationDate}&time=${time}&platform=${platform}`}>
                   <div className='py-2 px-4 bg-secondary rounded-md my-3 flex items-center gap-3'>
                     <span className='text-white/60'><FaRegFileLines size={20}/></span>
-                    <p className='text-white/60 mb-0'>{name}</p>
+                    <p className='text-white/60 mb-0'>{i+1}-{name}</p>
                     <span className='ml-10 text-white/50'>Created at: {creationDate}</span>
                     <span className='ml-10 text-white/50'>Last modified: {creationDate}</span>
                   </div>

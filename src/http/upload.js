@@ -14,7 +14,11 @@ export const uploadHandler = async (formData,setUploadProgress) => await api.pos
 ,onUploadProgress: (progressEvent) => {
     const { loaded, total } = progressEvent;
     let precentage = Math.floor((loaded * 100) / total);
-    setUploadProgress(precentage);
+    if(precentage > 90){
+        setUploadProgress(91);
+    }else{
+        setUploadProgress(precentage);
+    }
   }
 
 })

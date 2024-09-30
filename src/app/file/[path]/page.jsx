@@ -5,6 +5,7 @@ import { getFile } from '@/http/upload';
 import React, { useEffect, useRef, useState } from 'react'
 import { FaPause, FaPlay, FaRegFileLines } from 'react-icons/fa6';
 
+
 function formatDateTime(date, time) {
     // Extract day, month, and year from the date part
     const [day, month, year] = date.split('-');
@@ -28,12 +29,17 @@ function formatDateTime(date, time) {
 }
 
 const page = ({ searchParams }) => {
+    const { filename, audioPath, creationDate, platform, time } = searchParams;
     const [content, setContent] = useState();
-    const [contentFilder, setContentFilter] = useState();
+    const [contentFilder, setContentFilter] = useState([]);
     const [query, setQuery] = useState(searchParams.query || '');
-    const { filename, audioPath, creationDate,platform,time } = searchParams;
-   
-    
+    const [currentTime, setCurrentTime] = useState(0);
+    const [currentIndex, setCurrentIndex] = useState(undefined);
+    const [mergeContent, setMergeContent] = useState('');
+    const [filterMergeContent, setFilterMergeContent] = useState('');
+
+
+
     const [play, setPlay] = useState(false);
     const audioRef = useRef(null);
 
@@ -64,19 +70,77 @@ const page = ({ searchParams }) => {
             setPlay(true)
             audioRef.current.play();
             audioRef.current.volume = 1;
+            setCurrentIndex(-1)
         }
     }
 
 
+    const onTimeUpdate = () => {
+
+        const time = audioRef.current.currentTime;
+        console.log(time, 'ssss')
+        setCurrentTime(time);
+    };
+
+    useEffect(() => {
+        audioRef.current?.addEventListener('timeupdate', onTimeUpdate);
+        audioRef.current?.addEventListener('ended', () => {
+            setCurrentIndex(undefined);
+            setPlay(false)
+        });
+
+        return () => {
+            audioRef.current?.removeEventListener('timeupdate', onTimeUpdate);
+            audioRef.current?.removeEventListener('ended', () => {
+                setCurrentIndex(undefined);
+                setPlay(false)
+            });
+        }
+    }, [audioRef.current])
+
+
+    useEffect(() => {
+        let index = undefined;
+        for (let i = 0; i < contentFilder.length; i++) {
+            if (currentTime >= parseFloat(contentFilder[i][1])) {
+                if (i > currentIndex) {
+                    console.log(i, currentIndex)
+                    index = i;
+                    break;
+                }
+
+            }
+        }
+        console.log(index)
+        if (index != undefined) {
+            setCurrentIndex(index);
+        }
+    }, [currentTime, contentFilder]);
+
+
+    useEffect(() => {
+        if (content) {
+            try {
+                const filterContentData = JSON.parse(content);
+                setContentFilter(filterContentData)
+                const merge = filterContentData?.map(w => w[0]?.trim()).join(" ");
+                setMergeContent(merge);
+            } catch (error) {
+                setContentFilter(["Transcibe Failed"]);
+            }
+        }
+    }, [content])
+
 
     useEffect(() => {
         if (query) {
-            const filterContentData = content?.toLocaleLowerCase().replaceAll(query.toLocaleLowerCase(), `<span style="background: red;">${query}</span>`)
-            setContentFilter(filterContentData)
+
+            const filterContentData = mergeContent?.toLocaleLowerCase().replaceAll(query.toLocaleLowerCase(), `<span style="background: red;">${query}</span>`)
+            setFilterMergeContent(filterContentData)
         } else {
-            setContentFilter(content)
+            setFilterMergeContent(mergeContent);
         }
-    }, [content, query])
+    }, [mergeContent, query])
     return (
         <section className="section bg-primary min-h-screen px-10 py-10">
             <div className="container mx-auto">
@@ -98,15 +162,39 @@ const page = ({ searchParams }) => {
                             }
 
                         </span>
-                        <span>{audioPath?.replace('/public/Calls/','')?.split('/')[0]}/{filename}</span>
+                        <span>{audioPath?.replace('/public/Calls/', '')?.split('/')[0]}/{filename}</span>
                         <span className='ml-10 text-white/50'>Call On: {formatDateTime(creationDate, time)}</span>
                         <span className='ml-10 text-white/50'>Last modified: {creationDate}</span>
-                        <span className='ml-10' onClick={() => handlePlay(`${FILE_MANAGER}${audioPath}`)}>{!play ? <FaPlay color='white' size={22} /> : <FaPause color='white' size={22} />}</span>
+                        {/* <span className='ml-10' onClick={() => handlePlay(`${FILE_MANAGER}${audioPath}`)}>{!play ? <FaPlay color='white' size={22} /> : <FaPause color='white' size={22} />}</span> */}
                     </p>
+                    <audio src={`${FILE_MANAGER}${audioPath}`} controls ref={audioRef} onPlay={handlePlay} onPause={handlePlay} className='max-w-2xl mx-auto'></audio>
+                 
                 </div>
-                <p className='border border-gray-300 rounded-md p-4 h-[80vh] overflow-y-auto text-white/80 leading-6 font-normal' dangerouslySetInnerHTML={{ __html: contentFilder }}>
+                {
+                    !query &&
 
-                </p>
+                    <p className='border border-gray-300 rounded-md p-4 h-[80vh] overflow-y-auto text-white/80 leading-6 font-normal' >
+                        {contentFilder.map((word, index) => (
+                            <span
+                                title={word[1]}
+                                key={index}
+                                style={{
+                                    color: currentIndex === index ? 'red' : '',
+                                    fontWeight: currentIndex === index ? 'bold' : 'normal'
+                                }}
+                            >
+                                {word[0]}{' '}
+                            </span>
+                        ))}
+                    </p>
+                }
+
+
+
+                {
+                    query &&
+                    <p className='border border-gray-300 rounded-md p-4 h-[80vh] overflow-y-auto text-white/80 leading-6 font-normal' dangerouslySetInnerHTML={{ __html: filterMergeContent }}></p>
+                }
             </div>
         </section>
     )

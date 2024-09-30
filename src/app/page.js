@@ -9,6 +9,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { FaFile, FaFolder } from 'react-icons/fa6';
 import { FaRegFileLines } from "react-icons/fa6";
 import { RxCrossCircled } from "react-icons/rx";
+import { toast } from 'react-toastify';
+
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 function parseCustomDateTime(dateTimeStr) {
   // Extract date and time components
@@ -57,6 +63,7 @@ const FolderSelector = () => {
   const [directory, setDirectory] = useState([]);
   const [files, setFiles] = useState({});
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [result,setResult] = useState(null);
   
   const emptyDragRef = useRef();
   const DragRef = useRef();
@@ -67,14 +74,83 @@ const FolderSelector = () => {
     console.log(selectedFiles);
     const formData = new FormData();
     for (let i = 0; i < selectedFiles.length; i++) {
-      const element = selectedFiles[i];
-      formData.append('files', element);
-      formData.append(`path-${i}`,element.webkitRelativePath);
-      formData.append(`date-${i}`,element.lastModified)
+      const file = selectedFiles[i];
+      const [platform] = file.name.split('_');
+      const [filename,ext] = file.name.split('.');
+      let dateinfo, phone, _;
+      if (platform == 'phone') {
+        if(filename.split('_').length >= 4){
+          [_, dateinfo, _, phone] = filename.split('_');
+          console.log('upar')
+        }else{
+          [_, dateinfo, phone] = filename.split('_');
+          console.log('niche')
+        }
+        console.log(filename.split('_'),filename)
+      } else {
+        [_, dateinfo, phone] = filename.split('_');
+      }
+      console.log(platform, dateinfo, phone)
+      let name;
+      if (phone) {
+        if (isNaN(phone)) {
+          name = phone
+        } else {
+          let number = phone.slice(-10);
+          number = number.replaceAll(' ','');
+
+          const contactInfo = contact.filter(contact => contact.number?.replaceAll(' ','')?.includes(number));
+          console.log(contactInfo)
+          if (contactInfo.length == 0) {
+            name = phone;
+            name = `(${phone})_Not_Saved`
+          } else {
+            name = contactInfo[0].name;
+          }
+          }
+      }else{
+        name = "audio_file"
+      }
+      const time = dateinfo?.split('-')[1]
+      let date;
+      if(dateinfo){
+
+        date = parseCustomDateTime(dateinfo)
+      }else{
+        date = new Date();
+      }
+
+      name = name?.replaceAll(' ', '_');
+      console.info(name,phone,name || phone)
+      let filesname;
+      if(name == 'audio_file'){
+        filesname = `audios/${file.name.replaceAll(" ","_")}`;
+      }else{
+        filesname = `${name || phone}/${name || phone}.${ext}`;
+      }
+      formData.append('files', file)
+      formData.append(`path-${i}`, filesname)
+      formData.append(`creationdate-${i}`,file.lastModified)
+      formData.append(`date-${i}`,date.getTime() || new Date().getTime())
+      formData.append(`time-${i}`,time)
+
+      formData.append(`storepath-${i}`,`/root/file-manager-api/eligindi/Calls/${name}`)
+      
+    }
+
+    try{
+      const res = await uploadHandler(formData,setUploadProgress);
+    
+      setUploadProgress(100)
+      getFolders()
+      setUploadProgress(0)
+      setResult(res.data.result)
+      toast.success('Add Successfully');
+    } catch (error) {
+      toast.error(error.message)
     }
     
-    const res = await uploadHandler(formData);
-    getFolders()
+  
     setLoading(false)
     
   };
@@ -84,14 +160,84 @@ const FolderSelector = () => {
     const selectedFiles = Array.from(event.target.files);
     const formData = new FormData();
     for (let i = 0; i < selectedFiles.length; i++) {
-      const element = selectedFiles[i];
-      formData.append('files', element);
-      formData.append(`path-${i}`,element.name)
-      formData.append(`date-${i}`,element.lastModified)
+      const file = selectedFiles[i];
+      const [platform] = file.name.split('_');
+
+      const [filename,ext] = file.name.split('.');
+      let dateinfo, phone, _;
+      if (platform == 'phone') {
+        if(filename.split('_').length >= 4){
+          [_, dateinfo, _, phone] = filename.split('_');
+          console.log('upar')
+        }else{
+          [_, dateinfo, phone] = filename.split('_');
+          console.log('niche')
+        }
+        console.log(filename.split('_'),filename)
+      } else {
+        [_, dateinfo, phone] = filename.split('_');
+      }
+      console.log(platform, dateinfo, phone)
+      let name;
+      if (phone) {
+        if (isNaN(phone)) {
+          name = phone
+        } else {
+          let number = phone.slice(-10);
+          number = number.replaceAll(' ','');
+
+          const contactInfo = contact.filter(contact => contact.number?.replaceAll(' ','')?.includes(number));
+          console.log(contactInfo)
+          if (contactInfo.length == 0) {
+            name = phone;
+            name = `(${phone})_Not_Saved`
+          } else {
+            name = contactInfo[0].name;
+          }
+          }
+      }else{
+        name = 'audio_file'
+      }
+      const time = dateinfo?.split('-')[1]
+      let date;
+      if(dateinfo){
+
+        date = parseCustomDateTime(dateinfo)
+      }else{
+        date = new Date()
+      }
+  
+
+      name = name?.replaceAll(' ', '_');
+      console.info(name,phone,name || phone)
+      let filesname;
+      if(name == 'audio_file'){
+        filesname = `audios/${file.name.replaceAll(" ","_")}`;
+      }else{
+        filesname = `${name || phone}/${name || phone}.${ext}`;
+      }
+      formData.append('files', file)
+      formData.append(`path-${i}`, filesname)
+      formData.append(`creationdate-${i}`,file.lastModified)
+      formData.append(`date-${i}`,date.getTime() || new Date().getTime())
+      formData.append(`time-${i}`,time)
+
+      formData.append(`storepath-${i}`,`/root/file-manager-api/eligindi/Calls/${name}`)
+      
+    }
+
+    try{
+      const res = await uploadHandler(formData,setUploadProgress);
+      setUploadProgress(100)
+      getFolders()
+      setUploadProgress(0)
+      setResult(res.data.result)
+      toast.success('Add Successfully');
+    } catch (error) {
+      toast.error(error.message);  
     }
     
-    const res = await uploadHandler(formData);
-    getFolders()
+
     setLoading(false)
   };
 
@@ -169,17 +315,31 @@ const FolderSelector = () => {
           console.log(contactInfo)
           if (contactInfo.length == 0) {
             name = phone;
+            name = `(${phone})_Not_Saved`
           } else {
             name = contactInfo[0].name;
           }
           }
+      }else{
+        name = "audio_file"
       }
-      const time = dateinfo.split('-')[1]
-      const date = parseCustomDateTime(dateinfo)
+      const time = dateinfo?.split('-')[1]
+      let date;
+      if(dateinfo){
+
+        date = parseCustomDateTime(dateinfo)
+      }else{
+        date = new Date();
+      }
 
       name = name?.replaceAll(' ', '_');
       console.info(name,phone,name || phone)
-      const filesname = `${name || phone}/${name || phone}.${ext}`;
+      let filesname;
+      if(name == 'audio_file'){
+        filesname = `audios/${file.name.replaceAll(" ","_")}`;
+      }else{
+        filesname = `${name || phone}/${name || phone}.${ext}`;
+      }
       formData.append('files', file)
       formData.append(`path-${i}`, filesname)
       formData.append(`creationdate-${i}`,file.lastModified)
@@ -195,12 +355,19 @@ const FolderSelector = () => {
 
   
 
+    try {
+      const res = await uploadHandler(formData,setUploadProgress);
+      setUploadProgress(100)
 
-    const res = await uploadHandler(formData,setUploadProgress);
-
-    getFolders()
-    setUploadProgress(0)
+      getFolders()
+      setUploadProgress(0)
+      setResult(res.data.result)
+      toast.success('Add Successfully');
+    } catch (error) {
+      toast.error(error.message)
+    }
     setLoading(false)
+    
   };
 
   const handleDragOver = (event) => {
@@ -454,6 +621,17 @@ const FolderSelector = () => {
           </div>
           {
             loading && <TransferAnimation uploadProgress={uploadProgress}/>
+          }
+
+          {
+            !loading && result &&
+            <div className='flex items-center justify-end mt-2'>
+              <div className='flex items-center gap-5'>
+                  <p className='text-white'>File Upload Successfully</p>
+                  <Link className='underline text-blue-500' href={`/file/${result[0].filename}?path=./${result[0].path}&filename=${`${1}-${result[0].filename}`}&audioPath=${result[0].audioPath}&creationDate=${result[0].creationDate}&time=${result[0].time}&platform=${result[0].platform}`}>Click To View</Link>
+
+              </div>
+          </div>
           }
           </div>
         }

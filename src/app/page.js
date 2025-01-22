@@ -177,9 +177,9 @@ const FolderSelector = () => {
       } else {
         [_, dateinfo, phone] = filename.split('_');
       }
-      console.log(platform, dateinfo, phone)
+      let ttt = dateinfo?.split("-")[0]
       let name;
-      if (phone) {
+      if (phone && !isNaN(ttt)) {
         if (isNaN(phone)) {
           name = phone
         } else {
@@ -216,6 +216,8 @@ const FolderSelector = () => {
       }else{
         filesname = `${name || phone}/${name || phone}.${ext}`;
       }
+
+      console.log(filename)
       formData.append('files', file)
       formData.append(`path-${i}`, filesname)
       formData.append(`creationdate-${i}`,file.lastModified)
@@ -408,6 +410,7 @@ const FolderSelector = () => {
     try {
       const res = await contactRequest();
       setContact(res.data?.contact);
+      console.log('contact',res.data)
     } catch (error) {
       console.log(error)
     }
